@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+    "os"
 	"log"
 	"net/http"
 
@@ -20,8 +21,10 @@ type Timer struct {
 	CallbackReference string            `json:"callbackReference" bson:"callbackReference"`
 	DeleteAfter       int               `json:"deleteAfter" bson:"deleteAfter"`
 }
+var pswd = os.Getenv("MONGO_PSD")
+var uri = fmt.Sprintf("mongodb+srv://kaoutarch:%s@kluster.valbk6m.mongodb.net/?retryWrites=true&w=majority", pswd)
 func ConnectMongo() *mongo.Collection {
-	Ops := options.Client().ApplyURI("mongodb+srv://kaoutarch:tol2R9bTdGXuWiYG@kluster.valbk6m.mongodb.net/?retryWrites=true&w=majority")
+	Ops := options.Client().ApplyURI(uri)
 
 	c, err := mongo.Connect(context.TODO(), Ops)
 	if err != nil {
