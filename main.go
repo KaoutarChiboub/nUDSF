@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/joho/godotenv"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -21,11 +22,14 @@ type Timer struct {
 	CallbackReference string            `json:"callbackReference" bson:"callbackReference"`
 	DeleteAfter       int               `json:"deleteAfter" bson:"deleteAfter"`
 }
+
+// Load and get password from .env file
+var errenv = godotenv.Load()
 var pswd = os.Getenv("MONGO_PSD")
 var uri = fmt.Sprintf("mongodb+srv://kaoutarch:%s@kluster.valbk6m.mongodb.net/?retryWrites=true&w=majority", pswd)
+
 func ConnectMongo() *mongo.Collection {
 	Ops := options.Client().ApplyURI(uri)
-
 	c, err := mongo.Connect(context.TODO(), Ops)
 	if err != nil {
 		log.Fatal("Error connecting to MongoDB Atlas:", err)
