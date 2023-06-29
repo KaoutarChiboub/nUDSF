@@ -65,26 +65,33 @@ func replaceTimer(w http.ResponseWriter, r *http.Request){
 		http.Error(w, "Unauthorized: Modifying deleteAfter field of the last entry is not allowed. Please retry without it!", http.StatusUnauthorized)
     	return
 	}
-	//res := dbcon.FindOne(context.TODO(), filter)
-	replace := bson.D {
-		{"$set", bson.D {
-			{"timerid", timer.TimerID},
-			{"expires", timer.Expires},
-			{"metaTags", timer.MetaTags},
-			{"callbackReference", timer.CallbackReference},             
-		}},
-	}
-	res := dbcon.FindOneAndUpdate(context.TODO(), filter, replace)
-	if res != nil {
-		if res.Err() == mongo.ErrNoDocuments {
-			// Timer not found, return appropriate response
-			http.Error(w, "Timer not found. Please verify the timer ID or create a new one!", http.StatusNotFound)
-			return
+	// Go routine function to update/replace an existing timer in a synchronized way with the response
+	// Channel created to synchronize and receive answer from go routine
+	updateChan := make(chan struct{})
+	go func(){
+		defer close(updateChan)
+		replace := bson.D {
+			{"$set", bson.D {
+				{"timerid", timer.TimerID},
+				{"expires", timer.Expires},
+				{"metaTags", timer.MetaTags},
+				{"callbackReference", timer.CallbackReference},             
+			}},
 		}
-	}
-	_ = res.Decode(&timer)
+		res := dbcon.FindOneAndUpdate(context.TODO(), filter, replace)
+		if res != nil {
+			if res.Err() == mongo.ErrNoDocuments {
+				// Timer not found, return appropriate response
+				http.Error(w, "Timer not found. Please verify the timer ID or create a new one!", http.StatusNotFound)
+				return
+			}
+		}
+		_ = res.Decode(&timer)
+	}()
+	// Wait for the update to be complete so we can synchronize the response sent to client
+	<- updateChan
 	w.WriteHeader(http.StatusOK)
-    w.Write([]byte("Timer updated successfully!\n")) 
+    w.Write([]byte("This timer was updated successfully!\n")) 
 	json.NewEncoder(w).Encode(timer) 
 }
 
@@ -99,46 +106,64 @@ func createTimer(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to parse request body! Please verify json inputs type!", http.StatusBadRequest)
         return
     }
-	// Insert document into our db
-	_, err := dbcon.InsertOne(context.TODO(), timer)
+	// Go routine to insert document into our db and synchronize the reponses with the use of a channel
+	createChan := make(chan error)
+	go func(){
+		_, err := dbcon.InsertOne(context.TODO(), timer)
+		createChan <- err
+	}()
+	// Again we wait for the go routine to complete and receive its value
+	err := <-createChan
 	if err != nil {
 		http.Error(w, "Failed to insert a new timer to db!", http.StatusInternalServerError)
-		return
+		return 
 	}
 	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("The timer was created successfully!\n")) 
 	json.NewEncoder(w).Encode(timer)
 }
 
 func getTimers(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 	var timers []Timer
-	// Find/fetch all documents in db without any filter	
-	cur, err := dbcon.Find(context.TODO(), bson.M{})
-	if err != nil {
-		http.Error(w, "Failed to read from db", http.StatusInternalServerError)
-		return
-	}
-	// Defer the execution of closing the cursor until cur.Next returns
-	defer cur.Close(context.TODO())
-	// List all timers existing in database using a loop
-	for cur.Next(context.TODO()) {
-		var timer Timer
-		err := cur.Decode(&timer)
+	getChan := make(chan []Timer)
+	errChan := make(chan error)
+	// Go routine to fetch all docs (timers) from db
+	go func (){
+		cur, err := dbcon.Find(context.TODO(), bson.M{})
 		if err != nil {
-			log.Fatal(err)
+			errChan <- err
+			return
 		}
-		timers = append(timers, timer)
-	}
-	if err := cur.Err(); err != nil {
+		// Defer the execution of closing the cursor until cur.Next returns
+		defer cur.Close(context.TODO())
+		// List all timers existing in database using a loop
+		for cur.Next(context.TODO()) {
+			var timer Timer
+			err := cur.Decode(&timer)
+			if err != nil {
+				errChan <- err
+			}
+			timers = append(timers, timer)
+		}
+		if err := cur.Err(); err != nil {
+			errChan <- err
+			return
+		}
+		getChan <- timers
+	}()	
+	select {
+	case timers := <- getChan:
+		if len(timers) == 0 {
+			http.Error(w, "No timers found", http.StatusNotFound) // 404 NOT FOUND
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(timers)
+	case err := <- errChan :
+		http.Error(w, "Failed to read from db!", http.StatusInternalServerError)
 		log.Fatal(err)
 	}
-	// If no document is found, return 404 NOT FOUND
-	if len(timers) == 0 {
-        http.Error(w, "No timers found", http.StatusNotFound) // 404 NOT FOUND
-        return
-    }
-	w.WriteHeader(http.StatusOK) //200 SUCCESS
-	json.NewEncoder(w).Encode(timers) // List timers list
 }
 
 func main() {
