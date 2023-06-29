@@ -7,6 +7,7 @@ import (
     "os"
 	"log"
 	"net/http"
+	"flag"
 
 	"github.com/joho/godotenv"
 	"github.com/gorilla/mux"
@@ -26,6 +27,8 @@ type Timer struct {
 // Load and get password from .env file
 var errenv = godotenv.Load()
 var pswd = os.Getenv("MONGO_PSD")
+var certPath = os.Getenv("CERTIF_PATH")
+var keyPath = os.Getenv("KEY_PATH")
 var uri = fmt.Sprintf("mongodb+srv://kaoutarch:%s@kluster.valbk6m.mongodb.net/?retryWrites=true&w=majority", pswd)
 
 func ConnectMongo() *mongo.Collection {
@@ -167,12 +170,31 @@ func getTimers(w http.ResponseWriter, r *http.Request){
 }
 
 func main() {
-	r := mux.NewRouter()
+	// Configuring server/tls
+	host := flag.String("host", "localhost", "Required flag, must be the hostname that is resolvable via DNS, or 'localhost'")
+	port := flag.String("port", "8443", "The https port, defaults to 8443")
+	certFile := flag.String("certfile", certPath, "certificate file")
+	keyFile := flag.String("keyfile", keyPath, "key file")
+	flag.Parse()
 
+	if *host == "" || *certFile == "" || *keyFile == "" {
+		log.Fatalf("One or more required fields missing: serverCertFile, serverKeyFile, hostname or port")
+	}
+
+	// Initiating router to handle requests
+	r := mux.NewRouter()
 	r.HandleFunc("/timers/{id}", replaceTimer).Methods("PUT")
 	r.HandleFunc("/timers", getTimers).Methods("GET")
 	r.HandleFunc("/timers", createTimer).Methods("POST")
 
-	fmt.Printf("Starting the application at port 8080...\n")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	// For a simple HTTP server, please uncomment this section and do the ≠ for all TLS congif
+	//fmt.Printf("Starting the application at port 8080...\n")
+	//log.Fatal(http.ListenAndServe(":8080", r))
+	
+
+	log.Printf("Starting HTTPS server on %s and port %s", *host, *port)
+	if err := http.ListenAndServeTLS(*host+":"+*port, *certFile, *keyFile, r); err != nil {
+		log.Fatal(err)
+	}
+
 }
