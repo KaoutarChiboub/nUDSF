@@ -1,5 +1,5 @@
 # nUDSF Timer API
-The repo shed lights on a Go API to query timers from UDSF network function using MangoDB database. It allows you to create, update, and retrieve timers using HTTP requests.
+The repo shed lights on a Go API that queries timers from UDSF network function using MangoDB database. It allows you to create, update, and retrieve timers using HTTP requests.
 
 ### Prerequisites
 - Go installed
@@ -40,7 +40,7 @@ __If needed, in the code, you can modify the server to use simple HTTP without c
 ### Endpoints and testing
 For testing our API, we used a famous API platform called [Postman](https://www.postman.com/). As well as `cURL` requests for terminal-engaged testing. We will show you how to do some testing with both methods in the coming sections below.
 #### POST
-Create a new timer by sending a POST request to the /timers endpoint. The timer details should be included in the request body as JSON. The response will contain the created timer with a message stating the success of the request. The `timerid` must be unique. The type of inputs should be respected to avoid bad requests. And if the timerid is not found in db, it will return an error explaining that.
+Create a new timer by sending a POST request to the /timers endpoint. The timer details should be included in the request body as JSON. The response will contain the created timer with a message stating the success of the request. **The `timerid` must be unique**. The type of inputs should be respected to avoid bad requests. And if the timerid is not found in db, it will return an error explaining that.
 With cURL, it should be requested like the following:
 ```shell
 curl -X 'POST' 'https://localhost:8443/timers' -H 'accept: */*' -H 'Content-Type: application/json' -d '{ "timerid": "pineapple", "expires": "2023-06-26T13:40:17.396Z", "metaTags": {}, "callbackReference": "create", "deleteAfter": 0}'
@@ -68,5 +68,7 @@ curl -X 'GET' 'https://localhost:8443/timers'
 And with Postman:
 ![image get](./Postman/get.png)
 
+### API unit test and Request validation
+We have provided a unit testing file for our application in `main_test.go` which you can run using the command `go test` since Go will automatically detect all your test files and run them. 
 
-
+You can also notice request validation setup inside our program to verify some input fields. It is to be extended in case of having more restricted conditions on the request body.

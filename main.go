@@ -11,13 +11,14 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/gorilla/mux"
+	"github.com/go-playground/validator"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Timer struct {
-	TimerID           string            `json:"timerid" bson:"timerid"`
+	TimerID           string            `json:"timerid" bson:"timerid" validate:"required"`
 	Expires           string        `json:"expires" bson:"expires"`
 	MetaTags          map[string]string `json:"metaTags" bson:"metaTags"`
 	CallbackReference string            `json:"callbackReference" bson:"callbackReference"`
@@ -30,7 +31,9 @@ var pswd = os.Getenv("MONGO_PSD")
 var certPath = os.Getenv("CERTIF_PATH")
 var keyPath = os.Getenv("KEY_PATH")
 var uri = fmt.Sprintf("mongodb+srv://<username>:%s@<your_cluster_id_string>/?retryWrites=true&w=majority", pswd)
+var validate = validator.New()
 
+// Connect to our MongoDB server
 func ConnectMongo() *mongo.Collection {
 	Ops := options.Client().ApplyURI(uri)
 	c, err := mongo.Connect(context.TODO(), Ops)
@@ -61,6 +64,12 @@ func replaceTimer(w http.ResponseWriter, r *http.Request){
 	err := json.NewDecoder(r.Body).Decode(&timer)
 	if err != nil {
         http.Error(w, "Failed to parse request body! Please verify json inputs type!", http.StatusBadRequest)
+        return
+    }
+	// Check the validation of timer request against defined tags
+	err = validate.Struct(timer)
+    if err != nil {
+        http.Error(w, "Invalid request parameters!", http.StatusBadRequest)
         return
     }
 	// Check if the request is fully authorized: last entry to not be modified
@@ -109,6 +118,19 @@ func createTimer(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to parse request body! Please verify json inputs type!", http.StatusBadRequest)
         return
     }
+	// Request validation check
+	pserr = validate.Struct(timer)
+    if pserr != nil {
+        http.Error(w, "Invalid request parameters!", http.StatusBadRequest)
+        return
+    }
+	// Custom validation: Check if the timerid is unique
+	errUnique := UniqueField(timer.TimerID)
+	if errUnique != nil {
+		http.Error(w, "The timer ID must be unique!", http.StatusBadRequest)
+		return
+	}
+
 	// Go routine to insert document into our db and synchronize the reponses with the use of a channel
 	createChan := make(chan error)
 	go func(){
@@ -167,6 +189,24 @@ func getTimers(w http.ResponseWriter, r *http.Request){
 		http.Error(w, "Failed to read from db!", http.StatusInternalServerError)
 		log.Fatal(err)
 	}
+}
+
+// UniqueField function checks the uniqueness of the timerid in the database
+func UniqueField(timerID string) error {
+	filter := bson.M{"timerid": timerID}
+
+	// Check if a document with the given timerid already exists in the database
+	count, err := dbcon.CountDocuments(context.TODO(), filter, nil)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		// A document with the same timerid already exists
+		return fmt.Errorf("timer ID must be unique")
+	}
+
+	return nil
 }
 
 func main() {
