@@ -30,7 +30,7 @@ var errenv = godotenv.Load()
 var pswd = os.Getenv("MONGO_PSD")
 var certPath = os.Getenv("CERTIF_PATH")
 var keyPath = os.Getenv("KEY_PATH")
-var uri = fmt.Sprintf("mongodb+srv://<username>:%s@<your_cluster_id_string>/?retryWrites=true&w=majority", pswd)
+var uri = fmt.Sprintf("mongodb+srv://kaoutarch:%s@kluster.valbk6m.mongodb.net/?retryWrites=true&w=majority", pswd)
 var validate = validator.New()
 
 // Connect to our MongoDB server
