@@ -30,12 +30,12 @@ var errenv = godotenv.Load()
 var pswd = os.Getenv("MONGO_PSD")
 var certPath = os.Getenv("CERTIF_PATH")
 var keyPath = os.Getenv("KEY_PATH")
-var uri = fmt.Sprintf("mongodb+srv://<username>:%s@<your_cluster_id_string>/?retryWrites=true&w=majority", pswd)
+var URI = fmt.Sprintf("mongodb+srv://<your_username>:%s@<your_cluster_string_connection>/?retryWrites=true&w=majority", pswd)
 var validate = validator.New()
 
 // Connect to our MongoDB server
 func ConnectMongo() *mongo.Collection {
-	Ops := options.Client().ApplyURI(uri)
+	Ops := options.Client().ApplyURI(URI)
 	c, err := mongo.Connect(context.TODO(), Ops)
 	if err != nil {
 		log.Fatal("Error connecting to MongoDB Atlas:", err)
@@ -66,6 +66,12 @@ func replaceTimer(w http.ResponseWriter, r *http.Request){
         http.Error(w, "Failed to parse request body! Please verify json inputs type!", http.StatusBadRequest)
         return
     }
+	// Custom validation: Check if the timerid is unique
+	errUnique := UniqueField(timer.TimerID)
+	if errUnique != nil {
+		http.Error(w, "The (updated) timer ID must be unique!", http.StatusBadRequest)
+		return
+	}
 	// Check the validation of timer request against defined tags
 	err = validate.Struct(timer)
     if err != nil {
@@ -103,8 +109,7 @@ func replaceTimer(w http.ResponseWriter, r *http.Request){
 	// Wait for the update to be complete so we can synchronize the response sent to client
 	<- updateChan
 	w.WriteHeader(http.StatusOK)
-    w.Write([]byte("This timer was updated successfully!\n")) 
-	json.NewEncoder(w).Encode(timer) 
+    w.Write([]byte("The timer was updated successfully!\n")) 
 }
 
 func createTimer(w http.ResponseWriter, r *http.Request) {

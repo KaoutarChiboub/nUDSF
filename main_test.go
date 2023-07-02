@@ -7,14 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 	"os"
+	"fmt"
 
 	"github.com/gorilla/mux"
 )
-
 func TestCreateTimer(t *testing.T) {
-	// Create a new HTTP POST request with the timer data
+	// Create a new HTTP POST request with the timer data: we test an already existing timerid to create and check the fail error
 	timer := Timer{
-		TimerID:           "123",
+		TimerID:           "kaoutar",
 		Expires:           "2023-06-26T13:40:17.396Z",
 		MetaTags:          map[string]string{"tag1": "value1", "tag2": "value2"},
 		CallbackReference: "example",
@@ -67,7 +67,7 @@ func TestGetTimers(t *testing.T) {
 	}
 
 	// Check the response body
-	// Replace the expectedTimers slice with the expected timers retrieved from the database
+	// We out an empty timer array to test in case our db was empty what could be the reponse
 	expectedTimers := []Timer{}
 	expectedJSON, _ := json.Marshal(expectedTimers)
 	if rr.Body.String() != string(expectedJSON) {
@@ -76,13 +76,13 @@ func TestGetTimers(t *testing.T) {
 }
 
 func TestReplaceTimer(t *testing.T) {
-	// Create a new HTTP PUT request with the timer data
+	// Create a new HTTP PUT request with the timer data: Put a timerid that do NOT exists in db but a MODIFIED DeleteAfter field to test the response
 	timer := Timer{
-		TimerID:           "123",
+		TimerID:           "kaoutar22",
 		Expires:           "2023-06-26T13:40:17.396Z",
 		MetaTags:          map[string]string{"tag1": "value1", "tag2": "value2"},
-		CallbackReference: "example",
-		DeleteAfter:       0,
+		CallbackReference: "PUTexample",
+		DeleteAfter:       1000,
 	}
 	jsonTimer, _ := json.Marshal(timer)
 	req, err := http.NewRequest("PUT", "/timers/123", bytes.NewBuffer(jsonTimer))
@@ -104,14 +104,14 @@ func TestReplaceTimer(t *testing.T) {
 	}
 
 	// Check the response body
-	expectedResponse := "This timer was updated successfully!\n"
+	expectedResponse := "The timer was updated successfully!\n"
 	if rr.Body.String() != expectedResponse {
 		t.Errorf("Expected response body '%s' but got '%s'", expectedResponse, rr.Body.String())
 	}
 }
 
 func TestMain(m *testing.M) {
-	
+	fmt.Println("Running tests...")
 	// Run the tests
 	test := m.Run()
 	os.Exit(test)
