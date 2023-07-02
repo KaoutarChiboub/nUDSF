@@ -2,7 +2,7 @@
 The repo shed lights on a Go API that queries timers from UDSF network function using MangoDB database. It allows you to create, update, and retrieve timers using HTTP requests.
 
 ### Prerequisites
-- Go installed
+- Go installed (1.20)
 - [MongoDB Atlas](https://www.mongodb.com/atlas/database) account
 - CA certificate and key (.pem) 
 
@@ -10,6 +10,7 @@ The repo shed lights on a Go API that queries timers from UDSF network function 
 1- After making sure Go is installed, you can create a new project directory where to clone the repository:
 ```shell
 git clone https://github.com/KaoutarChiboub/nUDSF.git
+cd nUDFS
 ```
 2- Right after, you need to download Go dependencies and packages:
 ```shell
